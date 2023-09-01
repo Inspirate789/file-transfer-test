@@ -23,5 +23,5 @@ func GenerateFile(filename string, size int64) (err error) {
 		return err
 	}
 
-	return file.Close()
+	return nil
 }
