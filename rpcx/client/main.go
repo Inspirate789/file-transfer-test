@@ -4,6 +4,7 @@ import (
 	"context"
 	"file-transfer-test/generator"
 	"flag"
+	"github.com/smallnest/rpcx/protocol"
 	"log/slog"
 	"time"
 
@@ -28,7 +29,10 @@ func main() {
 		panic(err)
 	}
 
-	xClient := client.NewXClient(share.SendFileServiceName, client.Failtry, client.RandomSelect, d, client.DefaultOption)
+	opt := client.DefaultOption
+	opt.SerializeType = protocol.MsgPack
+
+	xClient := client.NewXClient(share.SendFileServiceName, client.Failtry, client.RandomSelect, d, opt)
 	defer func(xClient client.XClient) {
 		err = xClient.Close()
 		if err != nil {
@@ -37,6 +41,9 @@ func main() {
 	}(xClient)
 
 	err = generator.GenerateFile(filename, filesize)
+	if err != nil {
+		panic(err)
+	}
 
 	for {
 		err = xClient.SendFile(context.Background(), filename, 0, map[string]string{
