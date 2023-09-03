@@ -1,6 +1,7 @@
 package main
 
 import (
+	"file-transfer-test/rpcx/link_store"
 	"flag"
 	"github.com/smallnest/rpcx/share"
 	"io"
@@ -13,27 +14,10 @@ import (
 )
 
 const (
-	chunkSize = 1024
+	chunkSize        = 1024
+	addrSMC          = "localhost:8972"
+	fileTransferAddr = "localhost:8973"
 )
-
-var (
-	addr             = flag.String("addr", "localhost:8972", "server address")
-	fileTransferAddr = flag.String("transfer-addr", "localhost:8973", "data transfer address")
-)
-
-func main() {
-	flag.Parse()
-
-	s := server.NewServer()
-
-	p := server.NewFileTransfer(*fileTransferAddr, saveFileHandler, nil, 1000)
-	s.EnableFileTransfer(share.SendFileServiceName, p)
-
-	err := s.Serve("tcp", *addr)
-	if err != nil {
-		panic(err)
-	}
-}
 
 func saveFileHandler(conn net.Conn, args *share.FileTransferArgs) {
 	defer func() {
@@ -66,4 +50,22 @@ func saveFileHandler(conn net.Conn, args *share.FileTransferArgs) {
 		slog.Error(err.Error())
 	}
 	slog.Info("receive ok", slog.String("receive_end_time", time.Now().Format(time.StampMilli)))
+}
+
+func main() {
+	flag.Parse()
+
+	s := server.NewServer()
+	err := s.RegisterName("LinkService", link_store.NewLinkService(addrSMC), "")
+	if err != nil {
+		panic(err)
+	}
+	p := server.NewFileTransfer(fileTransferAddr, saveFileHandler, nil, 1000)
+	s.EnableFileTransfer(share.SendFileServiceName, p)
+
+	slog.Info("smc started", slog.String("addr", addrSMC))
+	err = s.Serve("tcp", addrSMC)
+	if err != nil {
+		panic(err)
+	}
 }
