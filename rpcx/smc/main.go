@@ -37,7 +37,11 @@ func saveFileHandler(conn net.Conn, args *share.FileTransferArgs) {
 		slog.Any("meta", args.Meta),
 		slog.String("receive_start_time", time.Now().Format(time.StampMilli)),
 	)
-	file, err := os.OpenFile(args.FileName+"_response", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	file, err := os.OpenFile(
+		args.FileName+"_"+conn.LocalAddr().String(),
+		os.O_WRONLY|os.O_CREATE|os.O_TRUNC,
+		0644,
+	)
 	if err != nil {
 		slog.Error(err.Error())
 		return

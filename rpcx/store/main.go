@@ -8,8 +8,10 @@ import (
 	"github.com/smallnest/rpcx/client"
 	"github.com/smallnest/rpcx/protocol"
 	"github.com/smallnest/rpcx/server"
+	"github.com/smallnest/rpcx/share"
 	"go.uber.org/multierr"
 	"log/slog"
+	"sync"
 )
 
 const (
@@ -19,6 +21,13 @@ const (
 var (
 	addrStore = flag.String("addr", "localhost:8800", "server address")
 )
+
+func closeXClient(xClient client.XClient, err error) {
+	err = multierr.Combine(err, xClient.Close())
+	if err != nil {
+		panic(err)
+	}
+}
 
 func main() {
 	flag.Parse()
@@ -31,22 +40,22 @@ func main() {
 	opt := client.DefaultOption
 	opt.SerializeType = protocol.MsgPack
 
-	xClient := client.NewXClient("LinkService", client.Failtry, client.RandomSelect, d, opt)
-	defer func(xClient client.XClient) {
-		err = multierr.Combine(err, xClient.Close())
-		if err != nil {
-			panic(err)
-		}
-	}(xClient)
+	xLinkClient := client.NewXClient("LinkService", client.Failtry, client.RandomSelect, d, opt)
+	defer closeXClient(xLinkClient, err)
+
+	xFileClient := client.NewXClient(share.SendFileServiceName, client.Failtry, client.RandomSelect, d, opt)
+	defer closeXClient(xFileClient, err)
 
 	s := server.NewServer()
-	err = s.RegisterName("FileService", file_transfer.NewFileService(xClient), "")
+	err = s.RegisterName("FileService", file_transfer.NewFileService(xFileClient), "")
 	if err != nil {
 		panic(err)
 	}
 
 	slog.Info("store started", slog.String("addr", *addrStore))
+	wg := sync.WaitGroup{}
 	go func() {
+		wg.Add(1)
 		err = multierr.Combine(s.Serve("tcp", *addrStore))
 		if err != nil {
 			panic(err)
@@ -55,9 +64,10 @@ func main() {
 
 	slog.Info("call to smc...")
 	req := link_store.Request{ClientAddr: *addrStore}
-	err = xClient.Call(context.Background(), "Link", req, &link_store.Response{})
+	err = xLinkClient.Call(context.Background(), "Link", req, &link_store.Response{})
 	if err != nil {
 		panic(err)
 	}
 	slog.Info("linked to smc")
+	wg.Wait()
 }

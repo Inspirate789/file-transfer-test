@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/smallnest/rpcx/client"
 	"github.com/smallnest/rpcx/protocol"
-	"github.com/smallnest/rpcx/share"
 	"log/slog"
 )
 
@@ -39,7 +38,7 @@ func (s *LinkService) Link(_ context.Context, arg Request, _ *Response) error {
 	opt := client.DefaultOption
 	opt.SerializeType = protocol.MsgPack
 
-	s.clients[arg.ClientAddr] = client.NewXClient(share.SendFileServiceName, client.Failtry, client.RandomSelect, d, opt)
+	s.clients[arg.ClientAddr] = client.NewXClient("FileService", client.Failtry, client.RandomSelect, d, opt)
 
 	return s.onLinkCallback(s.clients[arg.ClientAddr])
 }
