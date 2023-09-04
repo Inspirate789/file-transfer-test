@@ -3,9 +3,11 @@ package main
 import (
 	"file-transfer-test/rpcx/link_store"
 	"flag"
+	"github.com/smallnest/rpcx/log"
 	"github.com/smallnest/rpcx/server"
 	"go.uber.org/multierr"
 	"log/slog"
+	"os"
 )
 
 const (
@@ -14,6 +16,8 @@ const (
 
 func main() {
 	flag.Parse()
+	log.SetLogger(log.NewDefaultLogger(os.Stdout, "SMC", 0, log.LvMax))
+	slog.SetDefault(slog.Default().WithGroup("SMC"))
 
 	s := server.NewServer()
 	linkService := link_store.NewLinkService(addrSMC)
@@ -22,7 +26,7 @@ func main() {
 		panic(err)
 	}
 	defer func() {
-		err = multierr.Combine(err, linkService.DeleteLinkService())
+		err = multierr.Combine(err, link_store.DeleteLinkService(linkService))
 		if err != nil {
 			panic(err)
 		}

@@ -4,7 +4,9 @@ import (
 	"context"
 	"file-transfer-test/rpcx/link_store"
 	"flag"
+	"fmt"
 	"github.com/smallnest/rpcx/client"
+	"github.com/smallnest/rpcx/log"
 	"github.com/smallnest/rpcx/protocol"
 	"github.com/smallnest/rpcx/server"
 	"github.com/smallnest/rpcx/share"
@@ -60,6 +62,8 @@ func downloadFileHandler(conn net.Conn, args *share.DownloadFileArgs) {
 
 func main() {
 	flag.Parse()
+	log.SetLogger(log.NewDefaultLogger(os.Stdout, fmt.Sprintf("Store (%s)", *addrStore), 0, log.LvMax))
+	slog.SetDefault(slog.Default().WithGroup(fmt.Sprintf("Store (%s)", *addrStore)))
 
 	d, err := client.NewPeer2PeerDiscovery("tcp@"+addrSMC, "")
 	if err != nil {
@@ -97,6 +101,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	slog.Info("linked to smc")
+	// slog.Info("linked to smc")
 	wg.Wait()
 }
