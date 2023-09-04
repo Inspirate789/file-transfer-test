@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
+	"file-transfer-test/rpcx/file_transfer"
 	"file-transfer-test/rpcx/link_store"
 	"flag"
+	"github.com/smallnest/rpcx/client"
 	"github.com/smallnest/rpcx/share"
 	"io"
 	"log/slog"
@@ -20,6 +23,7 @@ const (
 )
 
 func saveFileHandler(conn net.Conn, args *share.FileTransferArgs) {
+	slog.Info("saveFileHandler called")
 	defer func() {
 		err := conn.Close()
 		if err != nil {
@@ -52,11 +56,29 @@ func saveFileHandler(conn net.Conn, args *share.FileTransferArgs) {
 	slog.Info("receive ok", slog.String("receive_end_time", time.Now().Format(time.StampMilli)))
 }
 
+func onLinkCallback(xClient client.XClient) error {
+	slog.Info("onLinkCallback called")
+	req := file_transfer.Request{IncidentID: 15}
+	resp := file_transfer.Response{}
+	err := xClient.Call(context.Background(), "GetIncidentFile", req, &resp)
+	if err != nil {
+		return err
+	}
+
+	slog.Info("file from store was sent",
+		slog.String("filename", resp.Filename),
+		slog.Int("size", int(resp.Filesize)),
+		slog.String("send_end_time", time.Now().Format(time.StampMilli)),
+	)
+
+	return nil
+}
+
 func main() {
 	flag.Parse()
 
 	s := server.NewServer()
-	err := s.RegisterName("LinkService", link_store.NewLinkService(addrSMC), "")
+	err := s.RegisterName("LinkService", link_store.NewLinkService(addrSMC, onLinkCallback), "")
 	if err != nil {
 		panic(err)
 	}

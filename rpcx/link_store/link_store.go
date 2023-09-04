@@ -5,6 +5,7 @@ import (
 	"github.com/smallnest/rpcx/client"
 	"github.com/smallnest/rpcx/protocol"
 	"github.com/smallnest/rpcx/share"
+	"log/slog"
 )
 
 type Request struct {
@@ -15,18 +16,21 @@ type Response struct {
 }
 
 type LinkService struct {
-	serviceAddr string
-	clients     map[string]client.XClient
+	serviceAddr    string
+	onLinkCallback func(client.XClient) error
+	clients        map[string]client.XClient
 }
 
-func NewLinkService(serviceAddr string) *LinkService {
+func NewLinkService(serviceAddr string, onLinkCallback func(client.XClient) error) *LinkService {
 	return &LinkService{
-		serviceAddr: serviceAddr,
-		clients:     make(map[string]client.XClient),
+		serviceAddr:    serviceAddr,
+		onLinkCallback: onLinkCallback,
+		clients:        make(map[string]client.XClient),
 	}
 }
 
 func (s *LinkService) Link(_ context.Context, arg Request, _ *Response) error {
+	slog.Info("LinkService.Link called")
 	d, err := client.NewPeer2PeerDiscovery("tcp@"+arg.ClientAddr, "")
 	if err != nil {
 		return err
@@ -37,5 +41,5 @@ func (s *LinkService) Link(_ context.Context, arg Request, _ *Response) error {
 
 	s.clients[arg.ClientAddr] = client.NewXClient(share.SendFileServiceName, client.Failtry, client.RandomSelect, d, opt)
 
-	return nil
+	return s.onLinkCallback(s.clients[arg.ClientAddr])
 }

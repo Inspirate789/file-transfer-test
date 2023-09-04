@@ -2,7 +2,10 @@ module file-transfer-test
 
 go 1.21
 
-require github.com/smallnest/rpcx v1.8.11
+require (
+	github.com/smallnest/rpcx v1.8.11
+	go.uber.org/multierr v1.11.0
+)
 
 require (
 	github.com/akutz/memconn v0.1.0 // indirect
