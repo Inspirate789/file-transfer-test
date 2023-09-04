@@ -39,6 +39,37 @@ func (s *LinkService) DeleteLinkService() error {
 	return nil
 }
 
+func (s *LinkService) receiveFile(clientAddr string) error {
+	slog.Info("LinkService.receiveFile called")
+
+	filename := clientAddr + ".txt"
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = file.Close()
+		if err != nil {
+			slog.Error(err.Error())
+		}
+	}()
+
+	slog.Info("receive file from store ...",
+		slog.String("receive_start_time", time.Now().Format(time.StampMilli)),
+	)
+	err = s.clients[clientAddr].DownloadFile(context.Background(), "file.txt", file, map[string]string{
+		"incident_id": "12345",
+	})
+	if err != nil {
+		return err
+	}
+	slog.Info("file from store received",
+		slog.String("receive_end_time", time.Now().Format(time.StampMilli)),
+	)
+
+	return nil
+}
+
 func (s *LinkService) Link(_ context.Context, arg Request, _ *Response) error {
 	slog.Info("LinkService.Link called")
 	d, err := client.NewPeer2PeerDiscovery("tcp@"+arg.ClientAddr, "")
@@ -51,23 +82,5 @@ func (s *LinkService) Link(_ context.Context, arg Request, _ *Response) error {
 
 	s.clients[arg.ClientAddr] = client.NewOneClient(client.Failtry, client.RandomSelect, d, opt)
 
-	filename := arg.ClientAddr + ".txt"
-	file, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	slog.Info("receive file from store ...",
-		slog.String("receive_start_time", time.Now().Format(time.StampMilli)),
-	)
-	err = s.clients[arg.ClientAddr].DownloadFile(context.Background(), "file.txt", file, map[string]string{"incident_id": "12345"})
-	if err != nil {
-		return err
-	}
-	slog.Info("file from store received",
-		slog.String("receive_end_time", time.Now().Format(time.StampMilli)),
-	)
-
-	return nil
+	return s.receiveFile(arg.ClientAddr)
 }
