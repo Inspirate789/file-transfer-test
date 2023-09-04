@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"file-transfer-test/rpcx/file_transfer"
 	"file-transfer-test/rpcx/link_store"
 	"flag"
 	"github.com/smallnest/rpcx/client"
@@ -10,23 +9,53 @@ import (
 	"github.com/smallnest/rpcx/server"
 	"github.com/smallnest/rpcx/share"
 	"go.uber.org/multierr"
+	"io"
 	"log/slog"
+	"net"
+	"os"
 	"sync"
+	"time"
 )
 
 const (
-	addrSMC = "localhost:8972"
+	addrSMC          = "localhost:8972"
+	fileTransferAddr = "localhost:8973"
 )
 
 var (
-	addrStore = flag.String("addr", "localhost:8800", "server address")
+	addrStore  = flag.String("addr", "localhost:8800", "server address")
+	fileBuffer = make([]byte, 1024)
 )
 
-func closeXClient(xClient client.XClient, err error) {
-	err = multierr.Combine(err, xClient.Close())
+func downloadFileHandler(conn net.Conn, args *share.DownloadFileArgs) {
+	slog.Info("send file to smc",
+		slog.Any("args", *args),
+		slog.String("send_start_time", time.Now().Format(time.StampMilli)),
+	)
+	defer func() {
+		err := conn.Close()
+		if err != nil {
+			slog.Error(err.Error())
+		}
+	}()
+
+	file, err := os.Open(args.FileName)
 	if err != nil {
-		panic(err)
+		slog.Error(err.Error())
+		return
 	}
+	defer func() {
+		err = file.Close()
+		if err != nil {
+			slog.Error(err.Error())
+		}
+	}()
+
+	_, err = io.CopyBuffer(conn, file, fileBuffer)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	slog.Info("send ok", slog.String("send_end_time", time.Now().Format(time.StampMilli)))
 }
 
 func main() {
@@ -40,23 +69,23 @@ func main() {
 	opt := client.DefaultOption
 	opt.SerializeType = protocol.MsgPack
 
-	xLinkClient := client.NewXClient("LinkService", client.Failtry, client.RandomSelect, d, opt)
-	defer closeXClient(xLinkClient, err)
-
-	xFileClient := client.NewXClient(share.SendFileServiceName, client.Failtry, client.RandomSelect, d, opt)
-	defer closeXClient(xFileClient, err)
+	xClient := client.NewXClient("LinkService", client.Failtry, client.RandomSelect, d, opt)
+	defer func(xClient client.XClient) {
+		err = multierr.Combine(err, xClient.Close())
+		if err != nil {
+			panic(err)
+		}
+	}(xClient)
 
 	s := server.NewServer()
-	err = s.RegisterName("FileService", file_transfer.NewFileService(xFileClient), "")
-	if err != nil {
-		panic(err)
-	}
+	p := server.NewFileTransfer(fileTransferAddr, nil, downloadFileHandler, 1000)
+	s.EnableFileTransfer(share.SendFileServiceName, p)
 
 	slog.Info("store started", slog.String("addr", *addrStore))
 	wg := sync.WaitGroup{}
 	go func() {
 		wg.Add(1)
-		err = multierr.Combine(s.Serve("tcp", *addrStore))
+		err = multierr.Combine(err, s.Serve("tcp", *addrStore))
 		if err != nil {
 			panic(err)
 		}
@@ -64,7 +93,7 @@ func main() {
 
 	slog.Info("call to smc...")
 	req := link_store.Request{ClientAddr: *addrStore}
-	err = xLinkClient.Call(context.Background(), "Link", req, &link_store.Response{})
+	err = xClient.Call(context.Background(), "Link", req, &link_store.Response{})
 	if err != nil {
 		panic(err)
 	}

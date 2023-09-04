@@ -5,6 +5,8 @@ import (
 	"github.com/smallnest/rpcx/client"
 	"github.com/smallnest/rpcx/protocol"
 	"log/slog"
+	"os"
+	"time"
 )
 
 type Request struct {
@@ -15,17 +17,26 @@ type Response struct {
 }
 
 type LinkService struct {
-	serviceAddr    string
-	onLinkCallback func(client.XClient) error
-	clients        map[string]client.XClient
+	serviceAddr string
+	clients     map[string]*client.OneClient
 }
 
-func NewLinkService(serviceAddr string, onLinkCallback func(client.XClient) error) *LinkService {
+func NewLinkService(serviceAddr string) *LinkService {
 	return &LinkService{
-		serviceAddr:    serviceAddr,
-		onLinkCallback: onLinkCallback,
-		clients:        make(map[string]client.XClient),
+		serviceAddr: serviceAddr,
+		clients:     make(map[string]*client.OneClient),
 	}
+}
+
+func (s *LinkService) DeleteLinkService() error {
+	for _, cl := range s.clients {
+		err := cl.Close()
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *LinkService) Link(_ context.Context, arg Request, _ *Response) error {
@@ -38,7 +49,25 @@ func (s *LinkService) Link(_ context.Context, arg Request, _ *Response) error {
 	opt := client.DefaultOption
 	opt.SerializeType = protocol.MsgPack
 
-	s.clients[arg.ClientAddr] = client.NewXClient("FileService", client.Failtry, client.RandomSelect, d, opt)
+	s.clients[arg.ClientAddr] = client.NewOneClient(client.Failtry, client.RandomSelect, d, opt)
 
-	return s.onLinkCallback(s.clients[arg.ClientAddr])
+	filename := arg.ClientAddr + ".txt"
+	file, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	slog.Info("receive file from store ...",
+		slog.String("receive_start_time", time.Now().Format(time.StampMilli)),
+	)
+	err = s.clients[arg.ClientAddr].DownloadFile(context.Background(), "file.txt", file, map[string]string{"incident_id": "12345"})
+	if err != nil {
+		return err
+	}
+	slog.Info("file from store received",
+		slog.String("receive_end_time", time.Now().Format(time.StampMilli)),
+	)
+
+	return nil
 }
