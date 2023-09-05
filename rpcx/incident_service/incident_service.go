@@ -21,26 +21,29 @@ type LinkRequest struct {
 }
 
 type IncidentRequest struct {
-	ClientAddr string
-	IncidentID string
+	ClientAddr    string
+	IncidentID    string
+	handlingCount uint
 }
 
 type Response struct {
 }
 
 type Service struct {
-	incidentsQueue chan IncidentRequest
-	fileChunkSize  uint
-	mx             sync.RWMutex
-	wg             sync.WaitGroup
-	clients        map[string]client.XClient
+	incidentsQueue   chan IncidentRequest
+	fileChunkSize    uint
+	retriesOnFailure uint
+	mx               sync.RWMutex
+	wg               sync.WaitGroup
+	clients          map[string]client.XClient
 }
 
-func NewService(reqLimit uint, chunkSize uint) (*Service, server.FileTransferHandler) {
+func NewService(reqLimit, chunkSize, retriesOnFailure uint) (*Service, server.FileTransferHandler) {
 	s := &Service{
-		incidentsQueue: make(chan IncidentRequest, reqLimit),
-		fileChunkSize:  chunkSize,
-		clients:        make(map[string]client.XClient),
+		incidentsQueue:   make(chan IncidentRequest, reqLimit),
+		fileChunkSize:    chunkSize,
+		retriesOnFailure: retriesOnFailure,
+		clients:          make(map[string]client.XClient),
 	}
 
 	go func() {
@@ -88,6 +91,10 @@ func (s *Service) Link(_ context.Context, arg LinkRequest, _ *Response) error {
 }
 
 func (s *Service) SendIncident(_ context.Context, arg IncidentRequest, _ *Response) error {
+	if arg.handlingCount > s.retriesOnFailure {
+		slog.Warn("incident retries limit has been reached", slog.Any("incident", arg))
+		return nil // TODO: ?????
+	}
 	slog.Debug("incident in pending", slog.Any("incident", arg))
 	s.incidentsQueue <- arg
 	return nil
@@ -109,7 +116,9 @@ func (s *Service) processIncidents() {
 		}
 		err := cl.Call(context.Background(), "RequestFile", args, &file_service.Response{}) // TODO: goroutine for waiting to recall?
 		if err != nil {
-			slog.Error(fmt.Sprintf("failed to call %s: %v", incident.ClientAddr, err)) // TODO: resend
+			slog.Error(fmt.Sprintf("failed to call %s: %v", incident.ClientAddr, err))
+			incident.handlingCount++
+			_ = s.SendIncident(context.Background(), incident, &Response{})
 		}
 	}
 }
@@ -145,7 +154,7 @@ func (s *Service) saveFileHandler(conn net.Conn, args *share.FileTransferArgs) {
 	_, err = io.CopyBuffer(file, conn, make([]byte, s.fileChunkSize))
 	if err != nil {
 		slog.Error(err.Error())
-		return
+		return // TODO: resend
 	}
 	slog.Info("receive ok", slog.String("receive_end_time", time.Now().Format(time.StampMilli)))
 }

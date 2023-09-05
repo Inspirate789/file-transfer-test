@@ -12,8 +12,9 @@ import (
 )
 
 const (
-	reqLimit  = 1000
-	chunkSize = 1024
+	reqLimit         = 1000
+	chunkSize        = 1024
+	retriesOnFailure = 5
 )
 
 var (
@@ -28,8 +29,8 @@ func main() {
 	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)).WithGroup("SMC"))
 
 	s := server.NewServer()
-	incidentService, saveFileHandler := incident_service.NewService(reqLimit, chunkSize)
-	p := server.NewFileTransfer(*addrFileTransfer, saveFileHandler, nil, 1000)
+	incidentService, saveFileHandler := incident_service.NewService(reqLimit, chunkSize, retriesOnFailure)
+	p := server.NewFileTransfer(*addrFileTransfer, saveFileHandler, nil, reqLimit)
 	s.EnableFileTransfer(share.SendFileServiceName, p)
 	err := s.RegisterName("IncidentService", incidentService, "")
 	if err != nil {

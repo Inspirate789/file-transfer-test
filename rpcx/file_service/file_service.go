@@ -89,7 +89,7 @@ func (s *Service) processRequests() {
 			slog.String("send_start_time", time.Now().Format(time.StampMilli)),
 			slog.String("filename", filename),
 		)
-		err := s.xClient.SendFile(context.Background(), filename, 0, nil) // TODO: context timeout?
+		err := s.xClient.SendFile(context.Background(), filename, 0, nil) // TODO: context timeout? // TODO: resend
 		if err != nil {
 			slog.Error(err.Error())
 			continue
