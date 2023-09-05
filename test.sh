@@ -17,24 +17,20 @@ go run ./rpcx/smc &
 sleep 0.5
 
 (( max_client="${1}" ))
-if [[ $max_client -ge 2 ]]; then
-  for i in $(seq 0 "$((max_client-2))");
+if [[ $max_client -ge 1 ]]; then
+  for i in $(seq 1 "$((max_client-1))");
     do
-      (( port1="$(calculate_port "$((2*i))")" ))
-      (( port2="$(calculate_port "$((2*i+1))")" ))
-      echo "localhost:$port1"
-      echo "localhost:$port2"
-      go run ./rpcx/store --addr_store "localhost:$port1" --addr_file_service "localhost:$port2" &
+      (( port="$(calculate_port "$i")" ))
+      echo "localhost:$port"
+      go run ./rpcx/store --addr "localhost:$port" --sleep 1 &
       # sleep 3
     done
 fi
 
 echo "press ctrl+c to stop the test"
-(( port1="$(calculate_port "$((2*(max_client-1)))")" ))
-(( port2="$(calculate_port "$((2*max_client-1))")" ))
-echo "localhost:$port1"
-echo "localhost:$port2"
-go run ./rpcx/store --addr_store "localhost:$port1" --addr_file_service "localhost:$port2"
+(( port="$(calculate_port "$max_client")" ))
+echo "localhost:$port"
+go run ./rpcx/store --addr "localhost:$port" --sleep 1
 pkill store
 pkill smc
 rm -rf out/*
