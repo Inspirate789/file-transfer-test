@@ -46,7 +46,7 @@ func DeleteLinkService(s *LinkService) error {
 func (s *LinkService) receiveFile(clientAddr string) error {
 	slog.Info("LinkService.receiveFile called")
 
-	filename := clientAddr + ".txt"
+	filename := "out/" + clientAddr + ".txt"
 	file, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -64,7 +64,7 @@ func (s *LinkService) receiveFile(clientAddr string) error {
 	s.mx.RLock()
 	cl := s.clients[clientAddr]
 	s.mx.RUnlock()
-	err = cl.DownloadFile(context.Background(), "file.txt", file, map[string]string{
+	err = cl.DownloadFile(context.Background(), "out/file.txt", file, map[string]string{
 		"incident_id": "12345",
 	})
 	if err != nil {

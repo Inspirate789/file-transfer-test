@@ -20,13 +20,13 @@ import (
 )
 
 const (
-	addrSMC          = "localhost:8972"
-	fileTransferAddr = "localhost:8973"
+	addrSMC = "localhost:8972"
 )
 
 var (
-	addrStore  = flag.String("addr", "localhost:8800", "server address")
-	fileBuffer = make([]byte, 1024)
+	addrStore        = flag.String("addr_store", "localhost:8800", "server address")
+	addrFileTransfer = flag.String("addr_file_service", "localhost:8801", "file transfer address")
+	fileBuffer       = make([]byte, 1024)
 )
 
 func downloadFileHandler(conn net.Conn, args *share.DownloadFileArgs) {
@@ -82,7 +82,7 @@ func main() {
 	}(xClient)
 
 	s := server.NewServer()
-	p := server.NewFileTransfer(fileTransferAddr, nil, downloadFileHandler, 1000)
+	p := server.NewFileTransfer(*addrFileTransfer, nil, downloadFileHandler, 1000)
 	s.EnableFileTransfer(share.SendFileServiceName, p)
 
 	slog.Info("store started", slog.String("addr", *addrStore))
