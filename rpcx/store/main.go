@@ -12,6 +12,7 @@ import (
 	"github.com/smallnest/rpcx/server"
 	"go.uber.org/multierr"
 	"log/slog"
+	"net"
 	"os"
 	"sync"
 	"time"
@@ -76,6 +77,14 @@ func main() {
 	}(xClient)
 
 	slog.Info("call to smc...")
+	host, _, _ := net.SplitHostPort(addrSMC)
+	rtt, err := client.Ping(host)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	slog.Info("Ping to server", slog.Int("rtt (ms)", rtt))
+
+	slog.Info("link to smc...")
 	linkReq := incident_service.LinkRequest{
 		ClientAddr: *addrStore,
 	}
