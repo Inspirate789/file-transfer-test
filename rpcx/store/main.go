@@ -82,7 +82,7 @@ func main() {
 	if err != nil {
 		slog.Error(err.Error())
 	}
-	slog.Info("Ping to server", slog.Int("rtt (ms)", rtt))
+	slog.Info("Ping to smc", slog.Int("rtt (ms)", rtt))
 
 	slog.Info("link to smc...")
 	linkReq := incident_service.LinkRequest{

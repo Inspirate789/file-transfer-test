@@ -80,6 +80,14 @@ func (s *Service) Link(_ context.Context, arg LinkRequest, _ *Response) error {
 	opt := client.DefaultOption
 	opt.SerializeType = protocol.MsgPack
 
+	slog.Info("call to store...")
+	host, _, _ := net.SplitHostPort(arg.ClientAddr)
+	rtt, err := client.Ping(host)
+	if err != nil {
+		slog.Error(err.Error())
+	}
+	slog.Info("Ping to store", slog.Int("rtt (ms)", rtt))
+
 	cl := client.NewXClient("FileService", client.Failtry, client.RandomSelect, d, opt)
 	s.mx.Lock()
 	s.clients[arg.ClientAddr] = cl
@@ -103,6 +111,15 @@ func (s *Service) SendIncident(_ context.Context, arg IncidentRequest, _ *Respon
 func (s *Service) processIncidents() {
 	for incident := range s.incidentsQueue {
 		slog.Debug("incident in progress", slog.Any("incident", incident))
+
+		slog.Info("call to store...")
+		host, _, _ := net.SplitHostPort(incident.ClientAddr)
+		rtt, err := client.Ping(host)
+		if err != nil {
+			slog.Error(err.Error())
+		}
+		slog.Info("Ping to store", slog.Int("rtt (ms)", rtt))
+
 		s.mx.RLock()
 		cl, inMap := s.clients[incident.ClientAddr]
 		s.mx.RUnlock()
@@ -114,7 +131,7 @@ func (s *Service) processIncidents() {
 			FileServiceAddr: incident.ClientAddr,
 			IncidentID:      incident.IncidentID,
 		}
-		err := cl.Call(context.Background(), "RequestFile", args, &file_service.Response{}) // TODO: goroutine for waiting to recall?
+		err = cl.Call(context.Background(), "RequestFile", args, &file_service.Response{}) // TODO: goroutine for waiting to recall?
 		if err != nil {
 			slog.Error(fmt.Sprintf("failed to call %s: %v", incident.ClientAddr, err))
 			incident.handlingCount++
