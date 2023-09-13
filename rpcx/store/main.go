@@ -19,23 +19,24 @@ import (
 )
 
 const (
-	addrSMC  = "localhost:8972"
-	reqLimit = 1000
+	hostStore = "localhost"
+	addrSMC   = "localhost:8972"
+	reqLimit  = 1000
 )
 
 var (
-	addrStore = flag.String("addr", "localhost:8800", "store address")
+	portStore = flag.String("port", ":8800", "store port")
 	sleepTime = flag.Uint("sleep", 0, "store sleep time between linking and sending incident (in seconds)")
 )
 
 func main() {
 	flag.Parse()
-	log.SetLogger(log.NewDefaultLogger(os.Stdout, fmt.Sprintf("Store (%s)", *addrStore), 0, log.LvMax))
+	log.SetLogger(log.NewDefaultLogger(os.Stdout, fmt.Sprintf("Store (%s)", *portStore), 0, log.LvMax))
 	opts := &slog.HandlerOptions{Level: slog.LevelDebug}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)).WithGroup(fmt.Sprintf("Store (%s)", *addrStore)))
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, opts)).WithGroup(fmt.Sprintf("Store (%s)", *portStore)))
 
 	s := server.NewServer()
-	fileService, err := file_service.NewService(*addrStore, addrSMC, reqLimit)
+	fileService, err := file_service.NewService(hostStore+(*portStore), addrSMC, reqLimit)
 	if err != nil {
 		panic(err)
 	}
@@ -53,12 +54,12 @@ func main() {
 	wg := sync.WaitGroup{}
 	go func() {
 		wg.Add(1)
-		err = multierr.Combine(err, s.Serve("tcp", *addrStore))
+		err = multierr.Combine(err, s.Serve("tcp", *portStore))
 		if err != nil {
 			panic(err)
 		}
 	}()
-	slog.Info("store started", slog.String("addr", *addrStore))
+	slog.Info("store started", slog.String("addr", *portStore))
 
 	d, err := client.NewPeer2PeerDiscovery("tcp@"+addrSMC, "")
 	if err != nil {
@@ -86,7 +87,7 @@ func main() {
 
 	slog.Info("link to smc...")
 	linkReq := incident_service.LinkRequest{
-		ClientAddr: *addrStore,
+		ClientAddr: hostStore + *portStore,
 	}
 	err = xClient.Call(context.Background(), "Link", linkReq, &file_service.Response{})
 	if err != nil {
@@ -97,7 +98,7 @@ func main() {
 	slog.Info("waiting for incident...")
 	time.Sleep(time.Duration(*sleepTime) * time.Second)
 	incidentReq := incident_service.IncidentRequest{
-		ClientAddr: *addrStore,
+		ClientAddr: hostStore + *portStore,
 		IncidentID: "12345",
 	}
 	err = xClient.Call(context.Background(), "SendIncident", incidentReq, &file_service.Response{})

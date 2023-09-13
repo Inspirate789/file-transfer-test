@@ -18,8 +18,8 @@ const (
 )
 
 var (
-	addrSMC          = flag.String("addr_smc", "localhost:8972", "SMC address")
-	addrFileTransfer = flag.String("addr_file_transfer", "localhost:8973", "file transfer address")
+	portSMC          = flag.String("port_smc", ":8972", "SMC port")
+	portFileTransfer = flag.String("port_file_transfer", ":8973", "file transfer port")
 )
 
 func main() {
@@ -30,7 +30,7 @@ func main() {
 
 	s := server.NewServer()
 	incidentService, saveFileHandler := incident_service.NewService(reqLimit, chunkSize, retriesOnFailure)
-	p := server.NewFileTransfer(*addrFileTransfer, saveFileHandler, nil, reqLimit)
+	p := server.NewFileTransfer(*portFileTransfer, saveFileHandler, nil, reqLimit)
 	s.EnableFileTransfer(share.SendFileServiceName, p)
 	err := s.RegisterName("IncidentService", incidentService, "")
 	if err != nil {
@@ -43,8 +43,8 @@ func main() {
 		}
 	}()
 
-	slog.Info("smc started", slog.String("addr", *addrSMC))
-	err = s.Serve("tcp", *addrSMC)
+	slog.Info("smc started", slog.String("addr", *portSMC))
+	err = s.Serve("tcp", *portSMC)
 	if err != nil {
 		panic(err)
 	}

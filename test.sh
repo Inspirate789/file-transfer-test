@@ -21,16 +21,14 @@ if [[ $max_client -ge 1 ]]; then
   for i in $(seq 1 "$((max_client-1))");
     do
       (( port="$(calculate_port "$i")" ))
-      echo "localhost:$port"
-      go run ./rpcx/store --addr "localhost:$port" --sleep 1 &
+      go run ./rpcx/store --port ":$port" --sleep 1 &
       # sleep 3
     done
 fi
 
 echo "press ctrl+c to stop the test"
 (( port="$(calculate_port "$max_client")" ))
-echo "localhost:$port"
-go run ./rpcx/store --addr "localhost:$port" --sleep 1
+go run ./rpcx/store --port ":$port" --sleep 1
 pkill store
 pkill smc
 rm -rf out/*
