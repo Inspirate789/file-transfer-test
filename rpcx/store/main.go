@@ -58,6 +58,7 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+		wg.Done()
 	}()
 	slog.Info("store started", slog.String("addr", *portStore))
 
